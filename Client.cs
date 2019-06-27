@@ -36,11 +36,13 @@ namespace Neutron.Server
         private Thread m_HandlerThread;
         private NeutronServer m_Server;
         private DateTime m_Created;
+        private Protocol m_Protocol;
 
         public Client (NeutronServer server, TcpClient client) {
             m_Server = server;
             m_Client = client;
             m_Created = DateTime.Now;
+            m_Protocol = new Protocol(client.GetStream());
         }
 
         public int Id {
@@ -61,7 +63,7 @@ namespace Neutron.Server
                 {
                     if(m_Client.Available > 0)
                     {
-                        Packet packet = Packet.Read(m_Client.GetStream());
+                        Packet packet = m_Protocol.Read();
                         m_Server.ProcessPacket(this, packet);
                     }
                     else {
@@ -101,15 +103,16 @@ namespace Neutron.Server
 
         public void Send(string eventId, string eventData)
         {
-            NetworkStream stream = m_Client.GetStream();
             MemoryStream data = new MemoryStream();
             BinaryWriter writer = new BinaryWriter(data);
             writer.Write(eventId);
             writer.Write(eventData);
             byte[] payload = data.ToArray();
-            stream.WriteByte(Packet.MSG_EVENT);
-            stream.Write(BitConverter.GetBytes(payload.Length), 0, 4);
-            stream.Write(payload, 0, payload.Length);
+
+            m_Protocol.Send(new Packet() {
+                type = Protocol.MSG_EVENT,
+                payload = payload
+            });
         }
     }
 }
